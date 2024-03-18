@@ -30,7 +30,7 @@ class UsersPublicView(viewsets.ModelViewSet):
 			raise ValidationError('Password not match')
 
 		request.data['confirm_code'] = generate_random_string()
-		serializer = UserSerializer(data = request.data)
+		serializer = self.get_serializer(data = request.data)
 		serializer.is_valid(raise_exception=True)
 		serializer.save()
 		return Response({'success':True,'message':'Kayıt oluşturuldu.', 'data':serializer.data})
