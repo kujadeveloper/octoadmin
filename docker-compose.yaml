@@ -1,0 +1,67 @@
+version: "3.8"
+services:
+  django:
+    image: python:3.9
+    depends_on:
+      - cache
+      - db-0
+      - elasticsearch
+    restart: always
+    command: bash -c 'cd /app && pip install -r requirement.txt && python manage.py collectstatic --noinput && python manage.py migrate && gunicorn -w 1 -b 0.0.0.0:8000 octoadmin.wsgi:application --reload --log-level 'debug''
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+  celery:
+    image: python:3.9
+    depends_on:
+      - cache
+    restart: always
+    command: bash -c 'cd /app && pip install -r requirement.txt && python manage.py collectstatic --noinput && python -m celery -A octoadmin worker -l info'
+    volumes:
+      - .:/app
+  celery-beat:
+    image: python:3.9
+    depends_on:
+      - cache
+      - db-0
+    restart: always
+    command: bash -c 'cd /app && pip install -r requirement.txt && python manage.py collectstatic --noinput && celery -A octoadmin beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler'
+    volumes:
+      - .:/app
+  db-0:
+    image: 'bitnami/postgresql:16.2.0'
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./data:/bitnami/postgresql
+      #- ./mypostresql.conf:/opt/bitnami/postgresql/conf/postgresql.conf
+      #- ./log_master/:/logs/
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_REPLICATION_USER=octoadmin
+      - POSTGRESQL_REPLICATION_PASSWORD=159357
+      - POSTGRESQL_PASSWORD=159357
+      - POSTGRESQL_DATABASE=octoadmin
+      - PGPASSWORD=159357
+      #- POSTGRESQL_EXTRA_FLAGS=-c logging_collector=on -c log_statement=all -c log_directory=/logs/ -c log_filename=postgresql-%Y-%m-%d.log
+  cache:
+    image: redis:latest
+    restart: always
+    command: redis-server --save 20 1 --loglevel warning --requirepass redis1759
+    ports:
+      - '6379:6379'
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
+    ports:
+      - '9200:9200'
+      - '9300:9300'
+    restart: always
+    volumes:
+      - ./data:/bitnami/postgresql
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+      - ELASTIC_PASSWORD=159357
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
